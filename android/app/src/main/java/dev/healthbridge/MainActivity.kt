@@ -1,5 +1,7 @@
 package dev.healthbridge
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var writer: HealthConnectWriter
     private lateinit var status: TextView
+    private lateinit var linkField: EditText
     private lateinit var nameField: EditText
     private lateinit var kcalField: EditText
     private lateinit var proteinField: EditText
@@ -88,6 +91,23 @@ class MainActivity : ComponentActivity() {
         status = TextView(this).apply { text = "HealthBridge" }
         root.addView(status, matchWrap())
 
+        linkField = EditText(this).apply {
+            hint = "Ссылка из ChatGPT: healthbridge://nutrition?..."
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            minLines = 2
+        }
+        root.addView(linkField, matchWrap())
+
+        root.addView(Button(this).apply {
+            text = "Вставить из буфера и распарсить"
+            setOnClickListener { pasteAndParse() }
+        }, matchWrap())
+
+        root.addView(Button(this).apply {
+            text = "Распарсить ссылку"
+            setOnClickListener { parseIncomingText(linkField.text.toString()) }
+        }, matchWrap())
+
         root.addView(Button(this).apply {
             text = "Дать доступ к питанию"
             setOnClickListener { requestPermissions.launch(setOf(writer.writePermission)) }
@@ -131,10 +151,46 @@ class MainActivity : ComponentActivity() {
         ViewGroup.LayoutParams.WRAP_CONTENT,
     )
 
+    private fun pasteAndParse() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = clipboard.primaryClip
+            ?.getItemAt(0)
+            ?.coerceToText(this)
+            ?.toString()
+            .orEmpty()
+
+        if (text.isBlank()) {
+            Toast.makeText(this, "Буфер пуст", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        linkField.setText(text)
+        parseIncomingText(text)
+    }
+
     private fun handleIntent(intent: Intent) {
-        val payload = intent.data?.let(NutritionPayload::fromUri) ?: return
+        val payload = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data?.let(NutritionPayload::fromUri)
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let(NutritionPayload::fromText)
+            else -> intent.data?.let(NutritionPayload::fromUri)
+        } ?: return
+
+        applyIncomingPayload(payload)
+    }
+
+    private fun parseIncomingText(text: String) {
+        val payload = NutritionPayload.fromText(text)
+        if (payload == null) {
+            status.text = "Не нашёл HealthBridge-ссылку"
+            Toast.makeText(this, "В тексте нет корректной healthbridge://nutrition ссылки", Toast.LENGTH_SHORT).show()
+            return
+        }
+        applyIncomingPayload(payload)
+    }
+
+    private fun applyIncomingPayload(payload: NutritionPayload) {
         fillForm(payload)
-        status.text = "Получено: ${payload.name}, ${payload.kcal} ккал"
+        status.text = "Получено: ${payload.name}, ${payload.kcal.clean()} ккал"
 
         if (payload.autocommit) {
             saveOrRequest(payload)
