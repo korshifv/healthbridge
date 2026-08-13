@@ -18,6 +18,25 @@ data class NutritionPayload(
     val autocommit: Boolean,
 ) {
     companion object {
+        private val linkRegex = Regex(
+            pattern = "healthbridge://nutrition\\?[^\\s<>\\\"']+",
+            option = RegexOption.IGNORE_CASE,
+        )
+
+        fun fromText(text: String): NutritionPayload? {
+            val trimmed = text.trim()
+            val candidate = if (trimmed.startsWith("healthbridge://nutrition", ignoreCase = true)) {
+                trimmed
+            } else {
+                linkRegex.find(trimmed)?.value
+            } ?: return null
+
+            val cleaned = candidate.trimEnd('.', ',', ';', ':', ')', ']', '}', '`')
+            return runCatching { Uri.parse(cleaned) }
+                .getOrNull()
+                ?.let(::fromUri)
+        }
+
         fun fromUri(uri: Uri): NutritionPayload? {
             if (uri.scheme != "healthbridge" || uri.host != "nutrition") return null
 
