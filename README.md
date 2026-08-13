@@ -22,7 +22,8 @@ Health data stays local to the Android device. The optional MCP helper only gene
 Requirements:
 
 - JDK 17+
-- Android SDK Platform 37
+- Android 16 SDK / API 36
+- Android SDK Build Tools 36.0.0
 - Gradle 9.5+
 
 ### Linux / CLI
