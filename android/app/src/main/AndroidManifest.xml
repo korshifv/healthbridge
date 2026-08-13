@@ -49,6 +49,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="healthbridge" android:host="nutrition" />
             </intent-filter>
+
+            <!-- Share text from ChatGPT (or any other app) directly into HealthBridge. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
     </application>
 
